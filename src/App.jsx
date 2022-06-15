@@ -4,11 +4,12 @@ import "./App.css";
 import abi from "./utils/WavePortal.json";
 
 const App = () => {
+  // Set some state variables
   const [currentAccount, setCurrentAccount] = useState("");
-
   const [allWaves, setAllWaves] = useState([]);
+  
+  // Address of goerli eth test network smart contract that this app interacts with
   const contractAddress = "0x3eA1845aD7F74F23Ff7285E3EE6C94a2ABBe482B";
-
   const contractABI = abi.abi;
 
   const checkIfWalletIsConnected = async () => {
@@ -36,9 +37,7 @@ const App = () => {
     }
   }
 
-  /**
-  * Implement your connectWallet method here
-  */
+  // Connect users meta mask wallet
   const connectWallet = async () => {
     try {
       const { ethereum } = window;
@@ -69,9 +68,7 @@ const App = () => {
         let count = await wavePortalContract.getTotalWaves();
         console.log("Retrieved total wave count...", count.toNumber());
 
-        /*
-        * Execute the actual wave from your smart contract
-        */
+        // Execute the actual wave from your smart contract
         const waveTxn = await wavePortalContract.wave("Helloooo from IRL", { gasLimit: 300000 });
         console.log("Mining...", waveTxn.hash);
 
@@ -89,7 +86,7 @@ const App = () => {
   }
 
   /*
-   * Create a method that gets all waves from your contract
+   * Create a method that gets all waves from the contract
    */
   const getAllWaves = async () => {
     console.log("get all waves tapped");
@@ -101,15 +98,11 @@ const App = () => {
         const wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
 
         /*
-         * Call the getAllWaves method from your Smart Contract
+         * Call the getAllWaves method from the Smart Contract
          */
         const waves = await wavePortalContract.getAllWaves();
 
-
-        /*
-         * We only need address, timestamp, and message in our UI so let's
-         * pick those out
-         */
+         // We only need address, timestamp, and message in our UI so pick those out
         let wavesCleaned = [];
         waves.forEach(wave => {
           wavesCleaned.push({
@@ -136,6 +129,39 @@ const App = () => {
     checkIfWalletIsConnected();
   }, [])
 
+  /**
+ * Listen in for emitter events!
+ */
+useEffect(() => {
+  let wavePortalContract;
+
+  const onNewWave = (from, timestamp, message) => {
+    console.log("NewWave", from, timestamp, message);
+    setAllWaves(prevState => [
+      ...prevState,
+      {
+        address: from,
+        timestamp: new Date(timestamp * 1000),
+        message: message,
+      },
+    ]);
+  };
+
+  if (window.ethereum) {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+
+    wavePortalContract = new ethers.Contract(contractAddress, contractABI, signer);
+    wavePortalContract.on("NewWave", onNewWave);
+  }
+
+  return () => {
+    if (wavePortalContract) {
+      wavePortalContract.off("NewWave", onNewWave);
+    }
+  };
+}, []);
+
   return (
     
       <div className="mainContainer" style={{ 
@@ -161,14 +187,18 @@ const App = () => {
 
         <div><br></br></div>
         
+        {currentAccount && (
         <button className="waveButton" onClick={wave}>
           Wave at Me
         </button>
+        )}
         <div><br></br></div>
 
+        {currentAccount && (
         <button className="waveButton" onClick={getAllWaves}>
           Get All Waves
         </button>
+        )}
 
         {allWaves.map((wave, index) => {
           return (
